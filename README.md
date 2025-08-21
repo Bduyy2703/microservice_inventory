@@ -54,6 +54,7 @@ Log dữ liệu (ví dụ: { sku: "ABC123", quantity: 50 }).
 Reporting Service:
 Nhận event inventory.updated (stub).
 Log để báo cáo (ví dụ: Tồn kho SKU ABC123 cập nhật: 50 đơn vị).
+
 ---------
 
 ## Lý do chia microservices
