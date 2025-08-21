@@ -1,52 +1,61 @@
 # Multi-Channel Inventory Management (Microservices)
 
-## Mục tiêu
-Thiết kế hệ thống quản lý tồn kho đa kênh (Amazon, Wayfair, …) theo kiến trúc **microservices** bằng NestJS.  
-Repo này chỉ dựng **skeleton code cho hệ thống quản lý tồn kho đa kênh**, chưa kết nối DB và RabbitMQ thật, nhưng đã chuẩn bị sẵn để mở rộng.
+🎯 Mục Tiêu
+Xây dựng hệ thống quản lý tồn kho đa kênh dựa trên microservices.
+Cung cấp skeleton code cho các service: API Gateway, Auth, Product, Inventory, Channel, Reporting.
+Chuẩn bị tích hợp thực tế với MySQL, Redis, và RabbitMQ (hiện tại là stub).
+Sử dụng Docker để đóng gói và chạy Auth Service.
+---------
 
----
+🏛️ Kiến Trúc Hệ Thống
+Hệ thống được chia thành các microservices độc lập, mỗi service đảm nhận một nhiệm vụ cụ thể:
 
-## Các Services
+API Gateway
+Điểm vào cho client/frontend.
+Chuyển hướng request đến các service phù hợp (Auth, Product, Inventory).
+Tương lai: Thêm rate limit và xác thực.
 
-- **API Gateway**  
-  Entry point cho client/frontend.
+Auth Service
+Quản lý xác thực người dùng, vai trò (role) và quyền (permission).
+Chuẩn bị cho Câu 2: Triển khai JWT, refresh token, rate limit.
+Dùng MySQL lưu user/role, Redis cho rate limit và blacklist token.
 
-- **Auth Service**  
-  Quản lý user, role, permission. (Dùng cho toàn hệ thống) và sẽ triển khai ở câu 2
+Product Service
+  Quản lý dữ liệu sản phẩm (SKU, tên, giá, thuộc tính như kích thước, màu sắc).
+  API:
+    POST /products: Tạo sản phẩm.
+    GET /products/:sku: Lấy thông tin sản phẩm.
+    PUT /products/:sku: Cập nhật sản phẩm.
+    DELETE /products/:sku: Xóa sản phẩm.
+  Lý do: Tập trung dữ liệu sản phẩm, tránh trùng lặp, dễ cache bằng Redis.
 
-- **Product Service**  
-  Quản lý dữ liệu master sản phẩm (SKU, giá, thuộc tính).
-  Chức năng:
-    Lưu trữ và quản lý danh mục sản phẩm: SKU, tên, mô tả, giá, hình ảnh, thuộc tính (kích thước, màu sắc).
-    CRUD sản phẩm (Create, Read, Update, Delete).
-    API: POST /products, GET /products/:sku, PUT /products/:sku, DELETE /products/:sku.
-  Lý do:
-    Tách biệt thông tin sản phẩm master để các kênh (Amazon, Wayfair) truy vấn chung, tránh duplicate data.
-    Độc lập, dễ mở rộng (thêm thuộc tính sản phẩm, tích hợp AI để gợi ý sản phẩm).
-    Dễ cache (Redis) để tăng tốc truy vấn.
+Inventory Service
+    Quản lý số lượng tồn kho cho từng SKU.
+    Stub API: POST /inventory/update (log thay đổi, giả lập emit event).
 
-- **Inventory Service**  
-  Quản lý số lượng tồn kho. Stub API:  
-  - `POST /inventory/update` → log update, giả lập emit event.
+Channel Service
+    Ánh xạ SKU nội bộ với SKU ngoài (Amazon, Wayfair).
+    Stub consumer: Nhận event inventory.updated, log kết quả.
 
-- **Channel Service**  
-  Mapping SKU nội bộ ↔ SKU ngoài (Amazon, Wayfair).  
-  Stub consumer: nhận event `inventory.updated`, log kết quả.
+Reporting Service
+    Ghi log đồng bộ và tạo báo cáo.
+    Stub consumer: Nhận event inventory.updated, log ra console.
+--------
 
-- **Reporting Service**  
-  Ghi log đồng bộ và thống kê.  
-  Stub consumer: nhận event `inventory.updated`, log ra console.
+🔄 Luồng Đồng Bộ Tồn Kho (Stub)
 
----
+Inventory Service:
+Client gọi POST /inventory/update để cập nhật tồn kho (ví dụ: { "sku": "ABC123", "quantity": 50 }).
+Log thay đổi và giả lập emit event inventory.updated qua RabbitMQ.
 
-## Luồng đồng bộ (Stub)
+Channel Service:
+Nhận event inventory.updated (stub).
+Log dữ liệu (ví dụ: { sku: "ABC123", quantity: 50 }).
 
-1. **Inventory Service** cập nhật tồn kho (`POST /inventory/update`).  
-2. Thực tế sẽ **emit event `inventory.updated`** qua RabbitMQ.  
-3. **Channel Service** và **Reporting Service** sẽ subscribe event này.  
-4. Hiện tại, cả 2 service chỉ log dữ liệu ra console (stub).  
-
----
+Reporting Service:
+Nhận event inventory.updated (stub).
+Log để báo cáo (ví dụ: Tồn kho SKU ABC123 cập nhật: 50 đơn vị).
+---------
 
 ## Lý do chia microservices
 
@@ -58,14 +67,21 @@ Repo này chỉ dựng **skeleton code cho hệ thống quản lý tồn kho đa
 
 - **Chuẩn bị cho tương lai**: Dù hiện tại hệ thống chỉ chạy local với stub, việc thiết kế microservices từ đầu giúp dễ dàng tích hợp RabbitMQ, MySQL riêng cho từng service, hoặc chuyển sang gRPC/Kafka sau này mà không cần viết lại toàn bộ.
 
-## Hướng phát triển
+## --------
+## 🚀 Hướng Phát Triển
+Kết nối database:
+Thêm MySQL cho Product (products table) và Inventory (inventory table).
+Viết entity và migration bằng TypeORM.
+Kết nối RabbitMQ:
+Triển khai producer/consumer thực tế cho event inventory.updated.
+Kết nối Inventory, Channel, Reporting Service qua queue.
 
-- Thêm kết nối MySQL riêng cho từng service.  
-- Triển khai RabbitMQ thật (`inventory.updated` → channel/reporting).  
-- Viết migration và entity cho các bảng.  
-- Monitoring + logging chi tiết.
-
----
-
-> 🔧 Hiện tại repo này chỉ phục vụ **Câu 1 của test**: trình bày tư duy kiến trúc và skeleton code.  
+## ---------
+# 📚 Công Nghệ Sử Dụng
+NestJS: Framework backend cho microservices.
+Docker: Đóng gói service và dependencies.
+MySQL: Lưu trữ user, sản phẩm, tồn kho (stub).
+Redis: Rate limit và blacklist token (stub).
+RabbitMQ: Queue cho đồng bộ tồn kho (stub).
+> 🔧 Hiện tại repo này chỉ phục vụ **Câu 1 của test**: trình bày tư duy kiến trúc và skeleton code
 > Để chạy API thực sự (Câu 2), sẽ build thêm Auth Service đầy đủ (JWT + refresh + rate limit).
