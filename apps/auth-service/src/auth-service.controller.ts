@@ -4,9 +4,10 @@ import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth-service.service';
 import { JwtAuthGuard } from '../jwt/jwt.guard';
-import { RegisterDto } from '../dto/register.dto';
-import { LoginDto } from '../dto/login.dto';
-import { RefreshDto } from '../dto/refresh_token.dto';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh_token.dto';
+import { RateLimitGuard } from '../jwt/ratelimit.guard';
 
 @ApiTags('Auth')
 @Controller('api/auth')
@@ -39,11 +40,11 @@ export class AuthController {
     return { message: 'Logged out successfully' };
   }
 
-  @Get('profile')
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  getProfile(@Req() req) {
-    console.log('User profile:', req.user);
-    return req.user;
-  }
+@Get('profile')
+@UseGuards( RateLimitGuard)
+async getProfile(@Req() req) {
+  const user = req.user;
+  return { id: user.sub, email: user.email, role: user.role };
+}
+
 }

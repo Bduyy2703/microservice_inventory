@@ -3,48 +3,41 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { User } from '../entity/user.entity';
-import { Role } from '../entity/role.entity';
+import { User } from './entity/user.entity';
+import { Role } from './entity/role.entity';
 import { randomBytes } from 'crypto';
+import { RedisClientType, createClient } from 'redis';
 
 @Injectable()
 export class AuthService {
+  private redisClient: RedisClientType;
+
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Role) private roleRepo: Repository<Role>,
     private jwtService: JwtService,
-  ) { }
-
-  async register(email: string, password: string) {
-    const hash = await bcrypt.hash(password, 10);
-    const role = await this.roleRepo.findOne({ where: { name: 'user' } });
-    if (!role) {
-      throw new Error('Default role "user" not found. Please seed roles first.');
-    }
-
-    const user = this.userRepo.create({
-      email,
-      password: hash,
-      role,
-    });
-
-    return this.userRepo.save(user);
-  }
-
-  async validateUser(email: string, pass: string) {
-    const user = await this.userRepo.findOne({
-      where: { email },
-      relations: ['role'], // 👈 load role
-    });
-
-    if (user && (await bcrypt.compare(pass, user.password))) {
-      return user;
-    }
-    throw new UnauthorizedException('Invalid credentials');
+  ) {
+    this.redisClient = createClient({ url: 'redis://localhost:6379' });
+    this.redisClient.connect();
   }
 
   private genJti() {
     return randomBytes(16).toString('hex');
+  }
+
+  async register(email: string, password: string) {
+    const hash = await bcrypt.hash(password, 10);
+    const role = await this.roleRepo.findOne({ where: { name: 'user' } });
+    if (!role) throw new Error('Default role "user" not found');
+
+    const user = this.userRepo.create({ email, password: hash, role });
+    return this.userRepo.save(user);
+  }
+
+  async validateUser(email: string, pass: string) {
+    const user = await this.userRepo.findOne({ where: { email }, relations: ['role'] });
+    if (user && (await bcrypt.compare(pass, user.password))) return user;
+    throw new UnauthorizedException('Invalid credentials');
   }
 
   async login(user: User) {
@@ -53,60 +46,40 @@ export class AuthService {
     const accessJti = this.genJti();
     const refreshJti = this.genJti();
 
-    const accessToken = this.jwtService.sign(
-      { ...payload, jti: accessJti },
-      { expiresIn: '15m' },
-    );
+    const accessToken = this.jwtService.sign({ ...payload, jti: accessJti }, { expiresIn: '15m' });
+    const refreshToken = this.jwtService.sign({ ...payload, jti: refreshJti, typ: 'refresh' }, { expiresIn: '7d' });
 
-    const refreshToken = this.jwtService.sign(
-      { ...payload, jti: refreshJti, typ: 'refresh' },
-      { expiresIn: '7d' },
-    );
-
-    // lưu hash + metadata
-    const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const hash = await bcrypt.hash(refreshToken, 10);
-    await this.userRepo.update(user.id, {
-      refreshTokenHash: hash,
-      refreshJti,
-      refreshExpiresAt,
-    });
+    await this.redisClient.set(`refresh:${user.id}`, JSON.stringify({ hash, jti: refreshJti }), { EX: 7 * 24 * 3600 });
+
     return { accessToken, refreshToken };
   }
+
   async refresh(refreshToken: string) {
     let decoded: any;
     try {
       decoded = this.jwtService.verify(refreshToken);
-    } catch (err) {
+    } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    if (decoded.typ !== 'refresh') {
-      throw new UnauthorizedException('Invalid token type');
-    }
+    if (decoded.typ !== 'refresh') throw new UnauthorizedException('Invalid token type');
 
     const userId = decoded.sub;
     const tokenJti = decoded.jti;
 
-    // Load user và check hash
-    const user = await this.userRepo.findOne({ where: { id: userId }, relations: ['role'] });
-    if (!user || !user.refreshTokenHash) {
-      throw new UnauthorizedException('No refresh token found for user');
-    }
+    const stored = await this.redisClient.get(`refresh:${userId}`);
+    if (!stored) throw new UnauthorizedException('No refresh token found');
 
-    // Check JTI: token cũ đã dùng rồi
-    if (tokenJti !== user.refreshJti) {
-      throw new UnauthorizedException('Refresh token already used');
-    }
+    const { hash, jti } = JSON.parse(stored);
 
-    // Check hash token
-    const isValid = await bcrypt.compare(refreshToken, user.refreshTokenHash);
-    if (!isValid) {
-      throw new UnauthorizedException('Refresh token revoked');
-    }
+    if (tokenJti !== jti) throw new UnauthorizedException('Refresh token already used');
 
-    // Rotate token: cấp cặp mới
-    const payload = { sub: user.id, role: user.role.name };
+    const isValid = await bcrypt.compare(refreshToken, hash);
+    if (!isValid) throw new UnauthorizedException('Refresh token revoked');
+
+    // Rotate token
+    const payload = { sub: userId, role: decoded.role };
     const newAccessJti = this.genJti();
     const newRefreshJti = this.genJti();
 
@@ -114,22 +87,12 @@ export class AuthService {
     const newRefreshToken = this.jwtService.sign({ ...payload, jti: newRefreshJti, typ: 'refresh' }, { expiresIn: '7d' });
 
     const newHash = await bcrypt.hash(newRefreshToken, 10);
-    const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    // Update DB với token mới
-    await this.userRepo.update(user.id, {
-      refreshTokenHash: newHash,
-      refreshJti: newRefreshJti,
-      refreshExpiresAt,
-    });
+    await this.redisClient.set(`refresh:${userId}`, JSON.stringify({ hash: newHash, jti: newRefreshJti }), { EX: 7 * 24 * 3600 });
 
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
+
   async logout(userId: number) {
-    await this.userRepo.update(userId, {
-      refreshTokenHash: null,
-      refreshJti: null,
-      refreshExpiresAt: null,
-    });
+    await this.redisClient.del(`refresh:${userId}`);
   }
 }

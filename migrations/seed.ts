@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
 import { NestFactory } from '@nestjs/core';
 import { AuthModule } from '../apps/auth-service/src/auth-service.module';
-import { Role } from '../apps/auth-service/entity/role.entity';
-import { User } from '../apps/auth-service/entity/user.entity';
+import { Role } from '../apps/auth-service/src/entity/role.entity';
+import { User } from '../apps/auth-service/src/entity/user.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 

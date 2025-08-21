@@ -1,8 +1,8 @@
 /* eslint-disable prettier/prettier */
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { User } from '../entity/user.entity';
+import { User } from '../src/entity/user.entity';
 import { ConfigService } from '@nestjs/config';
-import { Role } from '../entity/role.entity';
+import { Role } from '../src/entity/role.entity';
 import { RoleSeeder } from 'migrations/role.seed';
 import { AdminSeeder } from 'migrations/admin.seed';
 

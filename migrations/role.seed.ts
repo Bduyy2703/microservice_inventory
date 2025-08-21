@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 import { Seeder } from 'typeorm-extension';
-import { Role } from '../apps/auth-service/entity/role.entity';
+import { Role } from '../apps/auth-service/src/entity/role.entity';
 
 export class RoleSeeder implements Seeder {
   async run(dataSource: DataSource): Promise<void> {

@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { Seeder } from 'typeorm-extension';
-import { User } from '../apps/auth-service/entity/user.entity'; // sửa path cho đúng
-import { Role } from '../apps/auth-service/entity/role.entity';
+import { User } from '../apps/auth-service/src/entity/user.entity'; // sửa path cho đúng
+import { Role } from '../apps/auth-service/src/entity/role.entity';
 import * as bcrypt from 'bcrypt';
 
 export class AdminSeeder implements Seeder {
@@ -13,13 +13,13 @@ export class AdminSeeder implements Seeder {
       where: { name: 'admin' },
     });
     if (!adminRole) {
-      console.error('❌ Admin role not found. Run RoleSeeder first.');
+      console.error('Admin role not found. Run RoleSeeder first.');
       return;
     }
 
     const count = await userRepository.count();
     if (count > 0) {
-      console.log('⚠️ Users already exist. Skipping admin seed...');
+      console.log('Users already exist. Skipping admin seed...');
       return;
     }
 
