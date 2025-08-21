@@ -1,15 +1,15 @@
 # Multi-Channel Inventory Management (Microservices)
-
-🎯 Mục Tiêu
+---------
+## 🎯 Mục Tiêu
 Xây dựng hệ thống quản lý tồn kho đa kênh dựa trên microservices.
 Cung cấp skeleton code cho các service: API Gateway, Auth, Product, Inventory, Channel, Reporting.
 Chuẩn bị tích hợp thực tế với MySQL, Redis, và RabbitMQ (hiện tại là stub).
 Sử dụng Docker để đóng gói và chạy Auth Service.
+
 ---------
+## 🏛️ Kiến Trúc Hệ Thống
 
-🏛️ Kiến Trúc Hệ Thống
 Hệ thống được chia thành các microservices độc lập, mỗi service đảm nhận một nhiệm vụ cụ thể:
-
 API Gateway
 Điểm vào cho client/frontend.
 Chuyển hướng request đến các service phù hợp (Auth, Product, Inventory).
@@ -40,10 +40,9 @@ Channel Service
 Reporting Service
     Ghi log đồng bộ và tạo báo cáo.
     Stub consumer: Nhận event inventory.updated, log ra console.
+
 --------
-
-🔄 Luồng Đồng Bộ Tồn Kho (Stub)
-
+## 🔄 Luồng Đồng Bộ Tồn Kho (Stub)
 Inventory Service:
 Client gọi POST /inventory/update để cập nhật tồn kho (ví dụ: { "sku": "ABC123", "quantity": 50 }).
 Log thay đổi và giả lập emit event inventory.updated qua RabbitMQ.
