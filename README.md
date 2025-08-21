@@ -16,6 +16,14 @@ Repo này chỉ dựng **skeleton code cho hệ thống quản lý tồn kho đa
 
 - **Product Service**  
   Quản lý dữ liệu master sản phẩm (SKU, giá, thuộc tính).
+  Chức năng:
+    Lưu trữ và quản lý danh mục sản phẩm: SKU, tên, mô tả, giá, hình ảnh, thuộc tính (kích thước, màu sắc).
+    CRUD sản phẩm (Create, Read, Update, Delete).
+    API: POST /products, GET /products/:sku, PUT /products/:sku, DELETE /products/:sku.
+  Lý do:
+    Tách biệt thông tin sản phẩm master để các kênh (Amazon, Wayfair) truy vấn chung, tránh duplicate data.
+    Độc lập, dễ mở rộng (thêm thuộc tính sản phẩm, tích hợp AI để gợi ý sản phẩm).
+    Dễ cache (Redis) để tăng tốc truy vấn.
 
 - **Inventory Service**  
   Quản lý số lượng tồn kho. Stub API:  
