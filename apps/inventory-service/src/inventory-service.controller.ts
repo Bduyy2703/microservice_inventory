@@ -1,12 +1,31 @@
-import { Controller, Get } from '@nestjs/common';
-import { InventoryServiceService } from './inventory-service.service';
+import { Controller, Post, Body } from '@nestjs/common';
+import { RmqOptions } from '@nestjs/microservices';
 
-@Controller()
-export class InventoryServiceController {
-  constructor(private readonly inventoryServiceService: InventoryServiceService) {}
+import {
+  ClientProxy,
+  ClientProxyFactory,
+  Transport,
+} from '@nestjs/microservices';
 
-  @Get()
-  getHello(): string {
-    return this.inventoryServiceService.getHello();
+@Controller('inventory')
+export class InventoryController {
+  private client: ClientProxy;
+  constructor() {
+    this.client = ClientProxyFactory.create({
+      transport: Transport.RMQ,
+      options: {
+        urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
+        queue: 'inventory_queue',
+        queueOptions: { durable: true },
+      },
+    } as RmqOptions);
+  }
+
+  @Post('update')
+  updateInventory(@Body() data: { productId: number; quantity: number }) {
+    console.log('Inventory updated:', data);
+    // Emit event để Channel Service sync
+    this.client.emit('inventory.updated', data);
+    return { success: true };
   }
 }

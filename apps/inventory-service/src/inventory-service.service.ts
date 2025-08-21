@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 
-@Injectable()
-export class InventoryServiceService {
-  getHello(): string {
-    return 'Hello World!';
+@Controller('inventory')
+export class InventoryController {
+  @Post('update')
+  updateInventory(@Body() data: { productId: number; quantity: number }) {
+    console.log('Inventory updated (stub):', data);
+    // TODO: Thực tế sẽ emit event `inventory.updated` lên RabbitMQ
+    return { success: true, message: 'Stub inventory update logged' };
   }
 }
